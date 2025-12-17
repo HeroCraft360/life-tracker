@@ -1,0 +1,271 @@
+/* ======================================
+   GLOBAL PIXEL STYLE + BASE COLORS
+====================================== */
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+:root {
+  --ink: #2f5e5a;
+  --muted: #8ea0ad;
+  --pill: #ffffff;
+  --btn1: #78c9be;
+  --btn2: #6bb7c8;
+  --ring: #cfeef0;
+  --shadow: 0 12px 28px rgba(60,120,140,.12);
+  --radius: 16px;
+  --error-bg: #ffe8e8;
+  --error-text: #d84b4b;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  margin: 0;
+  font-family: 'Press Start 2P', monospace;
+  -webkit-font-smoothing: none; /* crisp pixels */
+  background: radial-gradient(1000px 540px at 50% -10%, #eaf6ff 0%, #f6fafc 70%);
+  color: var(--ink);
+}
+
+/* ======================================
+   SCREEN TRANSITION WRAPPER
+====================================== */
+#screens {
+  max-width: 1000px;
+  margin: 40px auto;
+  padding: 0 16px;
+}
+
+.screen {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity .45s ease, transform .45s ease;
+}
+.screen.is-leaving {
+  opacity: 0;
+  transform: translateY(12px);
+  pointer-events: none;
+}
+.screen.is-entering {
+  opacity: 0;
+  transform: translateY(-12px);
+}
+.screen.is-entering.is-active {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.hidden { display: none !important; }
+
+/* ======================================
+   WELCOME SCREEN
+====================================== */
+#welcome {
+  text-align: center;
+  margin-top: 80px;
+}
+
+#welcome .title {
+  font-size: 28px;
+  letter-spacing: 2px;
+  margin: 0 0 16px;
+  color: #2c7f77;
+  text-shadow: 0 2px 0 rgba(0,0,0,.03);
+}
+
+#welcome .hint {
+  margin: 4px 0 18px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.controls {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 14px;
+  margin: 0 auto 10px;
+}
+
+input#ageInput,
+input#bdayInput {
+  width: 200px;
+  padding: 14px 16px;
+  border: 2px solid #e1eef6;
+  border-radius: 14px;
+  background: var(--pill);
+  font: inherit;
+  font-size: 14px;
+  text-align: center;
+  box-shadow: var(--shadow);
+  outline: none;
+  transition: border-color .15s, box-shadow .15s, transform .06s;
+}
+input#bdayInput { width: 240px; }
+
+input#ageInput:focus,
+input#bdayInput:focus {
+  border-color: var(--ring);
+  box-shadow: 0 0 0 4px rgba(207,238,240,.55);
+}
+
+#startBtn {
+  padding: 14px 22px;
+  border: none;
+  border-radius: 14px;
+  background: linear-gradient(180deg, var(--btn1), var(--btn2));
+  color: #073a3a;
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+  box-shadow: 0 10px 24px rgba(80,170,170,.25);
+  transition: filter .2s, transform .06s;
+}
+#startBtn:hover { filter: brightness(1.04); }
+#startBtn:active { transform: translateY(1px); }
+
+.sub {
+  display: block;
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+#errorMsg {
+  margin: 10px auto 0;
+  padding: 8px 12px;
+  background: var(--error-bg);
+  border: 1px solid #f4b7b7;
+  color: var(--error-text);
+  border-radius: 10px;
+  font-size: 12px;
+  width: fit-content;
+}
+
+/* ======================================
+   SCENE SCREEN (Sky + Pixel Avatar)
+====================================== */
+#scene {
+  text-align: center;
+  position: relative;
+  margin-top: 30px;
+}
+
+/* Top bar with Back + Age */
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+.topbar button {
+  border: none;
+  background: var(--btn2);
+  color: white;
+  padding: 10px 18px;
+  border-radius: 10px;
+  cursor: pointer;
+  font: inherit;
+  box-shadow: var(--shadow);
+  transition: transform .1s, filter .2s;
+}
+.topbar button:hover { filter: brightness(1.05); }
+.topbar button:active { transform: translateY(1px); }
+
+.age-label {
+  background: var(--btn1);
+  color: #073a3a;
+  padding: 8px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  box-shadow: var(--shadow);
+}
+
+/* Countdown box */
+.countdown-box {
+  display: inline-block;
+  background: var(--pill);
+  border-radius: 14px;
+  padding: 18px 22px;
+  box-shadow: var(--shadow);
+  font-size: 12px;
+  color: var(--ink);
+  margin-bottom: 28px;
+}
+.countdown-line {
+  margin: 4px 0;
+}
+.countdown-big {
+  margin-top: 8px;
+  color: #2c7f77;
+}
+
+/* Stage with sky + character */
+.stage {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  margin: 0 auto;
+  width: 900px;
+  height: 300px;
+}
+
+#bgCanvas {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+}
+
+#characterCanvas {
+  position: relative;
+  z-index: 2;
+}
+
+/* Footer label */
+.bottom {
+  margin-top: 20px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+
+
+/* ========== Modal for Google sign-in ========== */
+.modal {
+  position: fixed; inset: 0;
+  background: rgba(20,30,40,.35);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 9999;
+  font-family: 'Press Start 2P', monospace;
+}
+.modal-card {
+  width: min(520px, 92%);
+  background: var(--pill);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  padding: 22px 20px;
+  text-align: center;
+}
+.modal-title { margin: 0 0 10px; color: #2c7f77; font-size: 18px; }
+.modal-sub { color: var(--muted); font-size: 12px; margin: 0 0 14px; }
+
+.modal-actions { display: flex; gap: 10px; justify-content: center; margin-bottom: 8px; }
+.btn {
+  font-family: inherit; font-size: 12px; cursor: pointer;
+  border-radius: 12px; border: 2px solid transparent;
+  padding: 12px 14px;
+}
+.btn.primary { background: linear-gradient(180deg, var(--btn1), var(--btn2)); color: #073a3a; }
+.btn.ghost { background: #fff; color: var(--ink); border-color: #dfeaf3; }
+.btn.tiny { padding: 6px 10px; font-size: 10px; border: 1px solid #cfe3ee; background: #fff; }
+
+.warn { color: #d84b4b; background: #ffe8e8; border:1px solid #f4b7b7; padding: 6px 8px; border-radius: 8px; display: inline-block; }
+
+/* user box in topbar */
+.userbox { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.userbox #userName { color: #2c7f77; font-size: 11px; }
