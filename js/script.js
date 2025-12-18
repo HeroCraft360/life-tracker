@@ -1,4 +1,4 @@
-// Life Tracker — age + DOB validation, countdown, clouds, pixel avatar, local save/load
+// Life Tracker — Smooth screens + validation + countdown + clouds + "bean" avatar (eyes follow mouse + click jump)
 document.addEventListener("DOMContentLoaded", () => {
   /* ============ DOM HOOKS ============ */
   const screens = {
@@ -14,34 +14,15 @@ document.addEventListener("DOMContentLoaded", () => {
   const errorMsg = document.getElementById("errorMsg");
 
   const ageBadge = document.getElementById("ageBadge");
-  const ageLabel = document.getElementById("ageLabel");
-  const bdayLabel = document.getElementById("bdayLabel");
+  const ageLabel = document.getElementById("ageLabel");   // "Age: —"
+  const bdayLabel = document.getElementById("bdayLabel"); // "Birthdate: —"
   const daysLeftEl = document.getElementById("daysLeft");
 
   const bgCanvas = document.getElementById("bgCanvas");
   const bgCtx = bgCanvas.getContext("2d");
+
   const charCanvas = document.getElementById("characterCanvas");
   const chCtx = charCanvas.getContext("2d");
-
-  /* ============ PERSISTENCE (guest/local) ============ */
-  const STORAGE_KEY = "lifeTracker:v1";
-  function saveState(age, dobStr) {
-    try {
-      localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify({ age: Number(age), dob: dobStr, savedAt: Date.now() })
-      );
-    } catch {}
-  }
-  function loadState() {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return null;
-      return JSON.parse(raw);
-    } catch {
-      return null;
-    }
-  }
 
   /* ============ SCREEN TRANSITIONS ============ */
   function show(el) { el.classList.remove("hidden"); }
@@ -88,14 +69,6 @@ document.addEventListener("DOMContentLoaded", () => {
   /* ============ VALIDATION + DATE HELPERS ============ */
   const DOB_REGEX = /^(\d{2})\/(\d{2})\/(\d{4})$/; // MM/DD/YYYY
 
-  function showError(text) {
-    errorMsg.textContent = text;
-    errorMsg.classList.remove("hidden");
-  }
-  function hideError() {
-    errorMsg.classList.add("hidden");
-  }
-
   function parseDOB(str) {
     if (!str) return null;
     const m = DOB_REGEX.exec(str.trim());
@@ -103,21 +76,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const mm = parseInt(m[1], 10);
     const dd = parseInt(m[2], 10);
     const yyyy = parseInt(m[3], 10);
-
     if (mm < 1 || mm > 12 || dd < 1 || dd > 31) return null;
-
     const d = new Date(yyyy, mm - 1, dd);
     if (d.getFullYear() !== yyyy || d.getMonth() !== (mm - 1) || d.getDate() !== dd) return null;
-
     return d;
-  }
-
-  // "real age" in years given DOB and "today"
-  function computeAgeFromDOB(dob, now = new Date()) {
-    let age = now.getFullYear() - dob.getFullYear();
-    const m = now.getMonth() - dob.getMonth();
-    if (m < 0 || (m === 0 && now.getDate() < dob.getDate())) age--;
-    return age;
   }
 
   function daysUntilNextBirthday(dob, now = new Date()) {
@@ -130,19 +92,29 @@ document.addEventListener("DOMContentLoaded", () => {
     return Math.ceil((next - today) / MS);
   }
 
-  // Checks if entered age is compatible with DOB.
-  // Allow ±1 year because birthday might not have happened yet this year.
-  function ageDobMakesSense(enteredAge, dob) {
-    const now = new Date();
-    const dobMidnight = new Date(dob.getFullYear(), dob.getMonth(), dob.getDate());
-    const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  // Computes "real" age from DOB based on today's date
+  function ageFromDOB(dob, now = new Date()) {
+    let age = now.getFullYear() - dob.getFullYear();
+    const thisYearsBirthday = new Date(now.getFullYear(), dob.getMonth(), dob.getDate());
+    if (now < thisYearsBirthday) age -= 1;
+    return age;
+  }
 
-    if (dobMidnight > todayMidnight) return false; // born in the future
+  function showError(text) {
+    errorMsg.textContent = text;
+    errorMsg.classList.remove("hidden");
+  }
+  function hideError() {
+    errorMsg.classList.add("hidden");
+  }
 
-    const computed = computeAgeFromDOB(dob, now);
-    const diff = Math.abs(computed - enteredAge);
-
-    return diff <= 1; // tolerance
+  /* ============ SCENE LABEL HELPERS ============ */
+  function fillScene(age, dobStr) {
+    ageBadge.textContent = `Age — ${age}`;
+    if (ageLabel) ageLabel.textContent = `Age: ${age}`;
+    if (bdayLabel) bdayLabel.textContent = `Birthdate: ${dobStr}`;
+    const dob = parseDOB(dobStr);
+    if (dob && daysLeftEl) daysLeftEl.textContent = String(daysUntilNextBirthday(dob));
   }
 
   /* ============ SKY: PASTEL CLOUDS ============ */
@@ -193,80 +165,264 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   requestAnimationFrame(animateSky);
 
-  /* ============ PIXEL AVATAR (16x16 grid) ============ */
-  function drawBlock(ctx, gx, gy, color, scale) {
-    ctx.fillStyle = color;
-    ctx.fillRect(gx * scale, gy * scale, scale, scale);
+  /* ============================================================
+     "BEAN" AVATAR (Fall-Guys-ish vibe) + Mouse eyes + Click jump
+     ============================================================ */
+
+  // HiDPI for character canvas
+  function sizeCharToCSSPixels() {
+    const dpr = Math.max(1, window.devicePixelRatio || 1);
+    const rect = charCanvas.getBoundingClientRect();
+    // if CSS not set, fallback to attribute
+    const cssW = rect.width || charCanvas.width;
+    const cssH = rect.height || charCanvas.height;
+
+    charCanvas.width = Math.round(cssW * dpr);
+    charCanvas.height = Math.round(cssH * dpr);
+    chCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  sizeCharToCSSPixels();
+  window.addEventListener("resize", sizeCharToCSSPixels);
+
+  const avatar = {
+    age: 18,
+    // mouse tracking
+    mouseX: null,
+    mouseY: null,
+    // jump physics
+    y: 0,
+    vy: 0,
+    // idle bob
+    t: 0,
+    // eye target offset
+    eyeOX: 0,
+    eyeOY: 0,
+    eyeTX: 0,
+    eyeTY: 0,
+  };
+
+  function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+
+  function beanPaletteByAge(age) {
+    const group = age <= 12 ? "child" : age <= 19 ? "teen" : age <= 59 ? "adult" : "elder";
+    // suit + accents
+    if (group === "child") return { suit: "#ff7aa2", shade: "#e65f8a", accent: "#ffffff" };
+    if (group === "teen") return { suit: "#7bd7c9", shade: "#5cc2b3", accent: "#ffffff" };
+    if (group === "adult") return { suit: "#7ec8ff", shade: "#5aaeea", accent: "#ffffff" };
+    return { suit: "#c9c9c9", shade: "#aeb1b6", accent: "#ffffff" };
   }
 
-  function drawCharacterForAge(ctx, age) {
-    const W = 16, H = 16;
-    const scale = Math.floor(Math.min(ctx.canvas.width, ctx.canvas.height) / H / 1.6);
+  function drawRoundedRect(ctx, x, y, w, h, r) {
+    const rr = Math.min(r, w / 2, h / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + rr, y);
+    ctx.arcTo(x + w, y, x + w, y + h, rr);
+    ctx.arcTo(x + w, y + h, x, y + h, rr);
+    ctx.arcTo(x, y + h, x, y, rr);
+    ctx.arcTo(x, y, x + w, y, rr);
+    ctx.closePath();
+  }
 
-    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-    ctx.imageSmoothingEnabled = false;
+  function renderBean() {
+    const ctx = chCtx;
+    const W = charCanvas.getBoundingClientRect().width || 240;
+    const H = charCanvas.getBoundingClientRect().height || 240;
 
+    ctx.clearRect(0, 0, W, H);
+
+    // layout
+    const cx = W / 2;
+    const groundY = H * 0.86;
+
+    // physics update
+    avatar.t += 0.03;
+
+    // gravity + floor
+    avatar.vy += 0.55;
+    avatar.y += avatar.vy;
+    if (avatar.y > 0) {
+      avatar.y = 0;
+      avatar.vy *= -0.12; // tiny settle bounce
+      if (Math.abs(avatar.vy) < 0.2) avatar.vy = 0;
+    }
+
+    // idle bob (only when not jumping much)
+    const idleBob = (Math.abs(avatar.vy) < 0.25) ? Math.sin(avatar.t) * 2.5 : 0;
+
+    const yOffset = idleBob + avatar.y; // avatar.y is negative when jumping
+
+    // size by age (subtle)
+    const sizeMul = avatar.age <= 12 ? 0.92 : avatar.age >= 60 ? 1.04 : 1.0;
+
+    const bodyW = 118 * sizeMul;
+    const bodyH = 150 * sizeMul;
+
+    const bodyX = cx - bodyW / 2;
+    const bodyY = groundY - bodyH + yOffset;
+
+    const { suit, shade } = beanPaletteByAge(avatar.age);
+
+    // shadow
     ctx.save();
-    const pxW = W * scale, pxH = H * scale;
-    ctx.translate((ctx.canvas.width - pxW) / 2, (ctx.canvas.height - pxH) / 2);
-
-    const group = age <= 12 ? "child" : age <= 19 ? "teen" : age <= 59 ? "adult" : "elder";
-    let shirt = "#ffd6a5", pants = "#7ec8ff", hair = "#6b3bff", skin = "#ffe6cc";
-    if (group === "teen") { shirt = "#9be7d9"; pants = "#3b7f9e"; hair = "#222831"; skin = "#ffd6b3"; }
-    if (group === "adult") { shirt = "#8fd3c7"; pants = "#3c6e71"; hair = "#2e2a26"; skin = "#ffd8b3"; }
-    if (group === "elder") { shirt = "#f0e5d8"; pants = "#8b9aa3"; hair = "#c9c9c9"; skin = "#ffdfc8"; }
-
-    // head
-    for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) drawBlock(ctx, 6 + x, 1 + y, skin, scale);
-    // hair
-    if (group !== "adult") [[6,0],[7,0],[8,0],[9,0],[5,1],[10,1]].forEach(([x,y]) => drawBlock(ctx, x, y, hair, scale));
-    else [[7,0],[8,0],[6,1],[9,1]].forEach(([x,y]) => drawBlock(ctx, x, y, hair, scale));
-    // eyes
-    drawBlock(ctx, 7, 2, "#201f1f", scale);
-    drawBlock(ctx, 8, 2, "#201f1f", scale);
-
-    // torso
-    for (let y = 0; y < 5; y++) for (let x = 0; x < 8; x++) drawBlock(ctx, 4 + x, 5 + y, shirt, scale);
-
-    // pants
-    for (let y = 0; y < 4; y++) {
-      for (let x = 2; x < 14; x++) {
-        if ((x === 7 || x === 8) && y > 0) continue;
-        drawBlock(ctx, x, 10 + y, pants, scale);
-      }
-    }
-
-    // shoes
-    [[3,14],[4,14],[11,14],[12,14]].forEach(([x,y]) => drawBlock(ctx, x, y, "#2b2b2b", scale));
-
-    // elder extras
-    if (group === "elder") {
-      [[6,2],[9,2]].forEach(([x,y]) => drawBlock(ctx, x, y, "#6b6b6b", scale));
-      [[13,11],[13,12]].forEach(([x,y]) => drawBlock(ctx, x, y, "#6b5b4b", scale));
-    }
-
+    ctx.globalAlpha = 0.20;
+    ctx.fillStyle = "#000";
+    drawRoundedRect(ctx, cx - bodyW * 0.36, groundY - 12, bodyW * 0.72, 18, 10);
+    ctx.fill();
     ctx.restore();
 
-    // bob once
-    if (!drawCharacterForAge._bob) {
-      let t = 0;
-      function bob() {
-        t += 0.04;
-        charCanvas.style.transform = `translateY(${Math.sin(t) * 2}px)`;
-        requestAnimationFrame(bob);
-      }
-      drawCharacterForAge._bob = true;
-      requestAnimationFrame(bob);
+    // body gradient (fake 3D)
+    const grad = ctx.createLinearGradient(bodyX, bodyY, bodyX + bodyW, bodyY + bodyH);
+    grad.addColorStop(0.0, shade);
+    grad.addColorStop(0.35, suit);
+    grad.addColorStop(1.0, shade);
+
+    ctx.fillStyle = grad;
+    drawRoundedRect(ctx, bodyX, bodyY, bodyW, bodyH, bodyW * 0.48);
+    ctx.fill();
+
+    // soft highlight
+    ctx.save();
+    ctx.globalAlpha = 0.12;
+    ctx.fillStyle = "#fff";
+    drawRoundedRect(ctx, bodyX + bodyW * 0.16, bodyY + bodyH * 0.16, bodyW * 0.22, bodyH * 0.58, bodyW * 0.22);
+    ctx.fill();
+    ctx.restore();
+
+    // arms (simple blobs)
+    ctx.save();
+    ctx.fillStyle = shade;
+    drawRoundedRect(ctx, bodyX - bodyW * 0.20, bodyY + bodyH * 0.36, bodyW * 0.32, bodyH * 0.34, 26);
+    ctx.fill();
+    drawRoundedRect(ctx, bodyX + bodyW * 0.88, bodyY + bodyH * 0.36, bodyW * 0.32, bodyH * 0.34, 26);
+    ctx.fill();
+    ctx.restore();
+
+    // feet
+    ctx.fillStyle = shade;
+    drawRoundedRect(ctx, cx - bodyW * 0.30, groundY - 28 + yOffset, bodyW * 0.26, 26, 12);
+    ctx.fill();
+    drawRoundedRect(ctx, cx + bodyW * 0.04, groundY - 28 + yOffset, bodyW * 0.26, 26, 12);
+    ctx.fill();
+
+    // face window
+    const faceW = bodyW * 0.58;
+    const faceH = bodyH * 0.40;
+    const faceX = cx - faceW / 2;
+    const faceY = bodyY + bodyH * 0.12;
+
+    ctx.fillStyle = "#ffffff";
+    drawRoundedRect(ctx, faceX, faceY, faceW, faceH, 26);
+    ctx.fill();
+
+    // Compute eye tracking (toward mouse)
+    const faceCX = cx;
+    const faceCY = faceY + faceH * 0.52;
+
+    if (avatar.mouseX != null && avatar.mouseY != null) {
+      const dx = avatar.mouseX - faceCX;
+      const dy = avatar.mouseY - faceCY;
+      const len = Math.hypot(dx, dy) || 1;
+      // eye offset target (small)
+      avatar.eyeTX = clamp((dx / len) * 6, -6, 6);
+      avatar.eyeTY = clamp((dy / len) * 4, -4, 4);
+    } else {
+      avatar.eyeTX = 0;
+      avatar.eyeTY = 0;
     }
+
+    // smooth follow
+    avatar.eyeOX += (avatar.eyeTX - avatar.eyeOX) * 0.12;
+    avatar.eyeOY += (avatar.eyeTY - avatar.eyeOY) * 0.12;
+
+    // eyes
+    const eyeGap = faceW * 0.18;
+    const eyeW = faceW * 0.12;
+    const eyeH = faceH * 0.28;
+
+    function drawEye(ex) {
+      ctx.fillStyle = "#111";
+      drawRoundedRect(
+        ctx,
+        ex - eyeW / 2 + avatar.eyeOX,
+        faceCY - eyeH / 2 + avatar.eyeOY,
+        eyeW,
+        eyeH,
+        eyeW / 2
+      );
+      ctx.fill();
+
+      // tiny highlight
+      ctx.save();
+      ctx.globalAlpha = 0.25;
+      ctx.fillStyle = "#fff";
+      drawRoundedRect(
+        ctx,
+        ex - eyeW * 0.18 + avatar.eyeOX,
+        faceCY - eyeH * 0.18 + avatar.eyeOY,
+        eyeW * 0.22,
+        eyeH * 0.18,
+        3
+      );
+      ctx.fill();
+      ctx.restore();
+    }
+
+    drawEye(faceCX - eyeGap);
+    drawEye(faceCX + eyeGap);
+
+    requestAnimationFrame(renderBean);
   }
 
-  /* ============ SCENE LABEL HELPERS ============ */
-  function fillScene(age, dobStr) {
-    ageBadge.textContent = `Age — ${age}`;
-    ageLabel.textContent = `Age: ${age}`;
-    bdayLabel.textContent = `Birthdate: ${dobStr}`;
-    const dob = parseDOB(dobStr);
-    if (dob) daysLeftEl.textContent = String(daysUntilNextBirthday(dob));
+  // Start animation loop once
+  requestAnimationFrame(renderBean);
+
+  // Mouse tracking over the whole stage (including canvas)
+  function setMouseFromEvent(e) {
+    const rect = charCanvas.getBoundingClientRect();
+    avatar.mouseX = (e.clientX - rect.left) * (rect.width ? (rect.width / rect.width) : 1);
+    avatar.mouseY = (e.clientY - rect.top) * (rect.height ? (rect.height / rect.height) : 1);
+    // NOTE: Since we render in CSS pixels (transform), we can use rect-relative pixels directly.
+    // If your canvas CSS size changes drastically, this still tracks fine visually.
+  }
+
+  charCanvas.addEventListener("mousemove", (e) => setMouseFromEvent(e));
+  charCanvas.addEventListener("mouseleave", () => {
+    avatar.mouseX = null;
+    avatar.mouseY = null;
+  });
+
+  // Click → jump + sound
+  function boing() {
+    try {
+      const AC = new (window.AudioContext || window.webkitAudioContext)();
+      const o = AC.createOscillator();
+      const g = AC.createGain();
+      o.type = "sine";
+      o.connect(g);
+      g.connect(AC.destination);
+
+      const now = AC.currentTime;
+      g.gain.setValueAtTime(0, now);
+      g.gain.linearRampToValueAtTime(0.14, now + 0.01);
+      o.frequency.setValueAtTime(260, now);
+      o.frequency.exponentialRampToValueAtTime(520, now + 0.08);
+      o.frequency.exponentialRampToValueAtTime(220, now + 0.20);
+      g.gain.exponentialRampToValueAtTime(0.0001, now + 0.26);
+
+      o.start(now);
+      o.stop(now + 0.28);
+    } catch {}
+  }
+
+  charCanvas.addEventListener("click", () => {
+    // impulse upward (negative y is up)
+    avatar.vy = -9.5;
+    boing();
+  });
+
+  // Change current age used by avatar look
+  function setAvatarAge(age) {
+    avatar.age = Number(age) || 18;
   }
 
   /* ============ BUTTON EVENTS ============ */
@@ -286,29 +442,30 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    // New logic: age + DOB must match reality-ish
-    if (!ageDobMakesSense(age, dob)) {
-      showError("That doesn’t make sense stop lying");
+    // If DOB is in the future -> invalid
+    const now = new Date();
+    if (dob > now) {
+      showError("That doesn't make sense stop lying");
+      return;
+    }
+
+    // "Stop lying" check: age must match DOB age (allow 1 year wiggle for timezone / rounding)
+    const realAge = ageFromDOB(dob, now);
+    if (Math.abs(realAge - age) > 1) {
+      showError("That doesn't make sense stop lying");
       return;
     }
 
     fillScene(age, dobStr);
+    setAvatarAge(age);
     goToScene();
-    drawCharacterForAge(chCtx, age);
-    saveState(age, dobStr);
   });
 
   backBtn.addEventListener("click", () => {
     backToWelcome();
+    // optional: keep avatar age preview in welcome if you want
   });
 
-  /* ============ AUTO-LOAD (Resume) ============ */
-  const saved = loadState();
-  if (saved && typeof saved.age === "number" && saved.dob) {
-    ageInput.value = saved.age;
-    bdayInput.value = saved.dob;
-  }
-
-  /* ============ INITIAL PREVIEW ============ */
-  drawCharacterForAge(chCtx, 18);
+  // Initial preview age
+  setAvatarAge(18);
 });
