@@ -1,10 +1,7 @@
-// Life Tracker — Smooth screens + validation + countdown + clouds + "bean" avatar (eyes follow mouse + click jump)
 document.addEventListener("DOMContentLoaded", () => {
-  /* ============ DOM HOOKS ============ */
-  const screens = {
-    welcome: document.getElementById("welcome"),
-    scene: document.getElementById("scene"),
-  };
+  /* ========= DOM ========= */
+  const welcome = document.getElementById("welcome");
+  const scene = document.getElementById("scene");
 
   const startBtn = document.getElementById("startBtn");
   const backBtn = document.getElementById("backBtn");
@@ -14,8 +11,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const errorMsg = document.getElementById("errorMsg");
 
   const ageBadge = document.getElementById("ageBadge");
-  const ageLabel = document.getElementById("ageLabel");   // "Age: —"
-  const bdayLabel = document.getElementById("bdayLabel"); // "Birthdate: —"
+  const ageLabel = document.getElementById("ageLabel");
+  const bdayLabel = document.getElementById("bdayLabel");
   const daysLeftEl = document.getElementById("daysLeft");
 
   const bgCanvas = document.getElementById("bgCanvas");
@@ -24,13 +21,11 @@ document.addEventListener("DOMContentLoaded", () => {
   const charCanvas = document.getElementById("characterCanvas");
   const chCtx = charCanvas.getContext("2d");
 
-  /* ============ SCREEN TRANSITIONS ============ */
+  /* ========= SCREEN HELPERS ========= */
   function show(el) { el.classList.remove("hidden"); }
   function hide(el) { el.classList.add("hidden"); }
 
   function goToScene() {
-    const welcome = screens.welcome, scene = screens.scene;
-
     scene.classList.add("is-entering");
     show(scene);
 
@@ -48,8 +43,6 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function backToWelcome() {
-    const welcome = screens.welcome, scene = screens.scene;
-
     welcome.classList.add("is-entering");
     show(welcome);
 
@@ -66,40 +59,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }, 450);
   }
 
-  /* ============ VALIDATION + DATE HELPERS ============ */
-  const DOB_REGEX = /^(\d{2})\/(\d{2})\/(\d{4})$/; // MM/DD/YYYY
-
-  function parseDOB(str) {
-    if (!str) return null;
-    const m = DOB_REGEX.exec(str.trim());
-    if (!m) return null;
-    const mm = parseInt(m[1], 10);
-    const dd = parseInt(m[2], 10);
-    const yyyy = parseInt(m[3], 10);
-    if (mm < 1 || mm > 12 || dd < 1 || dd > 31) return null;
-    const d = new Date(yyyy, mm - 1, dd);
-    if (d.getFullYear() !== yyyy || d.getMonth() !== (mm - 1) || d.getDate() !== dd) return null;
-    return d;
-  }
-
-  function daysUntilNextBirthday(dob, now = new Date()) {
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const m = dob.getMonth();
-    const d = dob.getDate();
-    let next = new Date(today.getFullYear(), m, d);
-    if (next < today) next = new Date(today.getFullYear() + 1, m, d);
-    const MS = 24 * 60 * 60 * 1000;
-    return Math.ceil((next - today) / MS);
-  }
-
-  // Computes "real" age from DOB based on today's date
-  function ageFromDOB(dob, now = new Date()) {
-    let age = now.getFullYear() - dob.getFullYear();
-    const thisYearsBirthday = new Date(now.getFullYear(), dob.getMonth(), dob.getDate());
-    if (now < thisYearsBirthday) age -= 1;
-    return age;
-  }
-
+  /* ========= ERRORS ========= */
   function showError(text) {
     errorMsg.textContent = text;
     errorMsg.classList.remove("hidden");
@@ -108,329 +68,353 @@ document.addEventListener("DOMContentLoaded", () => {
     errorMsg.classList.add("hidden");
   }
 
-  /* ============ SCENE LABEL HELPERS ============ */
+  /* ========= DOB + AGE LOGIC ========= */
+  const DOB_REGEX = /^(\d{2})\/(\d{2})\/(\d{4})$/; // MM/DD/YYYY
+
+  function parseDOB(str) {
+    if (!str) return null;
+    const m = DOB_REGEX.exec(str.trim());
+    if (!m) return null;
+
+    const mm = parseInt(m[1], 10);
+    const dd = parseInt(m[2], 10);
+    const yyyy = parseInt(m[3], 10);
+
+    if (mm < 1 || mm > 12 || dd < 1 || dd > 31) return null;
+
+    const d = new Date(yyyy, mm - 1, dd);
+    if (d.getFullYear() !== yyyy || d.getMonth() !== (mm - 1) || d.getDate() !== dd) return null;
+    return d;
+  }
+
+  function calcAgeFromDOB(dob, now = new Date()) {
+    let age = now.getFullYear() - dob.getFullYear();
+    const m = now.getMonth() - dob.getMonth();
+    if (m < 0 || (m === 0 && now.getDate() < dob.getDate())) age--;
+    return age;
+  }
+
+  function daysUntilNextBirthday(dob, now = new Date()) {
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    let next = new Date(today.getFullYear(), dob.getMonth(), dob.getDate());
+    if (next < today) next = new Date(today.getFullYear() + 1, dob.getMonth(), dob.getDate());
+    const MS = 24 * 60 * 60 * 1000;
+    return Math.ceil((next - today) / MS);
+  }
+
   function fillScene(age, dobStr) {
     ageBadge.textContent = `Age — ${age}`;
-    if (ageLabel) ageLabel.textContent = `Age: ${age}`;
-    if (bdayLabel) bdayLabel.textContent = `Birthdate: ${dobStr}`;
+    ageLabel.textContent = `Age: ${age}`;
+    bdayLabel.textContent = `Birthdate: ${dobStr}`;
     const dob = parseDOB(dobStr);
-    if (dob && daysLeftEl) daysLeftEl.textContent = String(daysUntilNextBirthday(dob));
+    if (dob) daysLeftEl.textContent = String(daysUntilNextBirthday(dob));
   }
 
-  /* ============ SKY: PASTEL CLOUDS ============ */
-  function sizeBgToCSSPixels() {
+  /* ========= RESIZE CANVASES (FULL SCREEN) ========= */
+  function resizeCanvases() {
     const dpr = Math.max(1, window.devicePixelRatio || 1);
-    const rect = bgCanvas.getBoundingClientRect();
-    bgCanvas.width = Math.round(rect.width * dpr);
-    bgCanvas.height = Math.round(rect.height * dpr);
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+
+    bgCanvas.width = Math.round(w * dpr);
+    bgCanvas.height = Math.round(h * dpr);
     bgCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  }
-  sizeBgToCSSPixels();
-  window.addEventListener("resize", sizeBgToCSSPixels);
 
-  const clouds = Array.from({ length: 6 }).map((_, i) => ({
-    x: Math.random() * 900,
-    y: 30 + i * 30,
-    w: 60 + Math.random() * 70,
-    h: 24 + Math.random() * 10,
-    speed: 0.2 + Math.random() * 0.25,
-    a: 0.9 - i * 0.1,
-  }));
-
-  function drawCloud(c) {
-    bgCtx.save();
-    bgCtx.globalAlpha = c.a;
-    bgCtx.fillStyle = "#ffffff";
-    for (let ix = -Math.floor(c.w / 6); ix <= Math.floor(c.w / 6); ix++) {
-      const yy = Math.sin((ix + c.x) * 0.1) * 3;
-      bgCtx.fillRect(Math.round(c.x + ix * 6), Math.round(c.y + yy), 6, c.h);
-    }
-    bgCtx.restore();
-  }
-
-  function animateSky() {
-    const g = bgCtx.createLinearGradient(0, 0, 0, bgCanvas.height);
-    g.addColorStop(0, "#dbeffb");
-    g.addColorStop(1, "#f7fdfd");
-    bgCtx.fillStyle = g;
-    bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
-
-    clouds.forEach((c) => {
-      c.x += c.speed;
-      if (c.x - c.w > bgCanvas.width) c.x = -c.w - 40;
-      drawCloud(c);
-    });
-
-    requestAnimationFrame(animateSky);
-  }
-  requestAnimationFrame(animateSky);
-
-  /* ============================================================
-     "BEAN" AVATAR (Fall-Guys-ish vibe) + Mouse eyes + Click jump
-     ============================================================ */
-
-  // HiDPI for character canvas
-  function sizeCharToCSSPixels() {
-    const dpr = Math.max(1, window.devicePixelRatio || 1);
-    const rect = charCanvas.getBoundingClientRect();
-    // if CSS not set, fallback to attribute
-    const cssW = rect.width || charCanvas.width;
-    const cssH = rect.height || charCanvas.height;
-
-    charCanvas.width = Math.round(cssW * dpr);
-    charCanvas.height = Math.round(cssH * dpr);
+    charCanvas.width = Math.round(w * dpr);
+    charCanvas.height = Math.round(h * dpr);
     chCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
-  sizeCharToCSSPixels();
-  window.addEventListener("resize", sizeCharToCSSPixels);
+  resizeCanvases();
+  window.addEventListener("resize", resizeCanvases);
 
-  const avatar = {
-    age: 18,
-    // mouse tracking
-    mouseX: null,
-    mouseY: null,
-    // jump physics
-    y: 0,
-    vy: 0,
-    // idle bob
-    t: 0,
-    // eye target offset
-    eyeOX: 0,
-    eyeOY: 0,
-    eyeTX: 0,
-    eyeTY: 0,
-  };
-
-  function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
-
-  function beanPaletteByAge(age) {
-    const group = age <= 12 ? "child" : age <= 19 ? "teen" : age <= 59 ? "adult" : "elder";
-    // suit + accents
-    if (group === "child") return { suit: "#ff7aa2", shade: "#e65f8a", accent: "#ffffff" };
-    if (group === "teen") return { suit: "#7bd7c9", shade: "#5cc2b3", accent: "#ffffff" };
-    if (group === "adult") return { suit: "#7ec8ff", shade: "#5aaeea", accent: "#ffffff" };
-    return { suit: "#c9c9c9", shade: "#aeb1b6", accent: "#ffffff" };
+  /* ========= BACKGROUND: MOVING CLOUDS (SMOOTH) ========= */
+  const clouds = [];
+  function makeClouds() {
+    clouds.length = 0;
+    const count = 26;
+    for (let i = 0; i < count; i++) {
+      clouds.push({
+        x: Math.random() * window.innerWidth,
+        y: 40 + Math.random() * (window.innerHeight * 0.35),
+        s: 0.6 + Math.random() * 1.4,
+        speed: 12 + Math.random() * 28,
+        a: 0.55 + Math.random() * 0.35
+      });
+    }
   }
+  makeClouds();
 
-  function drawRoundedRect(ctx, x, y, w, h, r) {
-    const rr = Math.min(r, w / 2, h / 2);
+  function drawPuffyCloud(ctx, c) {
+    ctx.save();
+    ctx.globalAlpha = c.a;
+    ctx.fillStyle = "rgba(255,255,255,0.98)";
+
+    const x = c.x;
+    const y = c.y;
+    const s = c.s;
+
     ctx.beginPath();
-    ctx.moveTo(x + rr, y);
-    ctx.arcTo(x + w, y, x + w, y + h, rr);
-    ctx.arcTo(x + w, y + h, x, y + h, rr);
-    ctx.arcTo(x, y + h, x, y, rr);
-    ctx.arcTo(x, y, x + w, y, rr);
+    ctx.arc(x + 0 * 34 * s, y + 6 * s, 20 * s, 0, Math.PI * 2);
+    ctx.arc(x + 18 * s, y + 0 * s, 26 * s, 0, Math.PI * 2);
+    ctx.arc(x + 44 * s, y + 6 * s, 20 * s, 0, Math.PI * 2);
+    ctx.arc(x + 24 * s, y + 14 * s, 24 * s, 0, Math.PI * 2);
     ctx.closePath();
+    ctx.fill();
+
+    // a bit more visible tint
+    ctx.globalAlpha = c.a * 0.22;
+    ctx.fillStyle = "rgba(120,170,200,1)";
+    ctx.beginPath();
+    ctx.arc(x + 18 * s, y + 12 * s, 22 * s, 0, Math.PI * 2);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.restore();
   }
 
-  function renderBean() {
-    const ctx = chCtx;
-    const W = charCanvas.getBoundingClientRect().width || 240;
-    const H = charCanvas.getBoundingClientRect().height || 240;
+  let lastBgT = 0;
+  function animateBg(t) {
+    const now = t || 0;
+    const dt = Math.min(0.05, (now - lastBgT) / 1000 || 0.016);
+    lastBgT = now;
 
-    ctx.clearRect(0, 0, W, H);
+    const g = bgCtx.createLinearGradient(0, 0, 0, window.innerHeight);
+    g.addColorStop(0, "#cfeeff");
+    g.addColorStop(1, "#f7fdff");
+    bgCtx.fillStyle = g;
+    bgCtx.fillRect(0, 0, window.innerWidth, window.innerHeight);
 
-    // layout
-    const cx = W / 2;
-    const groundY = H * 0.86;
-
-    // physics update
-    avatar.t += 0.03;
-
-    // gravity + floor
-    avatar.vy += 0.55;
-    avatar.y += avatar.vy;
-    if (avatar.y > 0) {
-      avatar.y = 0;
-      avatar.vy *= -0.12; // tiny settle bounce
-      if (Math.abs(avatar.vy) < 0.2) avatar.vy = 0;
+    for (const c of clouds) {
+      c.x += c.speed * dt;
+      if (c.x > window.innerWidth + 140) c.x = -160;
+      drawPuffyCloud(bgCtx, c);
     }
 
-    // idle bob (only when not jumping much)
-    const idleBob = (Math.abs(avatar.vy) < 0.25) ? Math.sin(avatar.t) * 2.5 : 0;
-
-    const yOffset = idleBob + avatar.y; // avatar.y is negative when jumping
-
-    // size by age (subtle)
-    const sizeMul = avatar.age <= 12 ? 0.92 : avatar.age >= 60 ? 1.04 : 1.0;
-
-    const bodyW = 118 * sizeMul;
-    const bodyH = 150 * sizeMul;
-
-    const bodyX = cx - bodyW / 2;
-    const bodyY = groundY - bodyH + yOffset;
-
-    const { suit, shade } = beanPaletteByAge(avatar.age);
-
-    // shadow
-    ctx.save();
-    ctx.globalAlpha = 0.20;
-    ctx.fillStyle = "#000";
-    drawRoundedRect(ctx, cx - bodyW * 0.36, groundY - 12, bodyW * 0.72, 18, 10);
-    ctx.fill();
-    ctx.restore();
-
-    // body gradient (fake 3D)
-    const grad = ctx.createLinearGradient(bodyX, bodyY, bodyX + bodyW, bodyY + bodyH);
-    grad.addColorStop(0.0, shade);
-    grad.addColorStop(0.35, suit);
-    grad.addColorStop(1.0, shade);
-
-    ctx.fillStyle = grad;
-    drawRoundedRect(ctx, bodyX, bodyY, bodyW, bodyH, bodyW * 0.48);
-    ctx.fill();
-
-    // soft highlight
-    ctx.save();
-    ctx.globalAlpha = 0.12;
-    ctx.fillStyle = "#fff";
-    drawRoundedRect(ctx, bodyX + bodyW * 0.16, bodyY + bodyH * 0.16, bodyW * 0.22, bodyH * 0.58, bodyW * 0.22);
-    ctx.fill();
-    ctx.restore();
-
-    // arms (simple blobs)
-    ctx.save();
-    ctx.fillStyle = shade;
-    drawRoundedRect(ctx, bodyX - bodyW * 0.20, bodyY + bodyH * 0.36, bodyW * 0.32, bodyH * 0.34, 26);
-    ctx.fill();
-    drawRoundedRect(ctx, bodyX + bodyW * 0.88, bodyY + bodyH * 0.36, bodyW * 0.32, bodyH * 0.34, 26);
-    ctx.fill();
-    ctx.restore();
-
-    // feet
-    ctx.fillStyle = shade;
-    drawRoundedRect(ctx, cx - bodyW * 0.30, groundY - 28 + yOffset, bodyW * 0.26, 26, 12);
-    ctx.fill();
-    drawRoundedRect(ctx, cx + bodyW * 0.04, groundY - 28 + yOffset, bodyW * 0.26, 26, 12);
-    ctx.fill();
-
-    // face window
-    const faceW = bodyW * 0.58;
-    const faceH = bodyH * 0.40;
-    const faceX = cx - faceW / 2;
-    const faceY = bodyY + bodyH * 0.12;
-
-    ctx.fillStyle = "#ffffff";
-    drawRoundedRect(ctx, faceX, faceY, faceW, faceH, 26);
-    ctx.fill();
-
-    // Compute eye tracking (toward mouse)
-    const faceCX = cx;
-    const faceCY = faceY + faceH * 0.52;
-
-    if (avatar.mouseX != null && avatar.mouseY != null) {
-      const dx = avatar.mouseX - faceCX;
-      const dy = avatar.mouseY - faceCY;
-      const len = Math.hypot(dx, dy) || 1;
-      // eye offset target (small)
-      avatar.eyeTX = clamp((dx / len) * 6, -6, 6);
-      avatar.eyeTY = clamp((dy / len) * 4, -4, 4);
-    } else {
-      avatar.eyeTX = 0;
-      avatar.eyeTY = 0;
-    }
-
-    // smooth follow
-    avatar.eyeOX += (avatar.eyeTX - avatar.eyeOX) * 0.12;
-    avatar.eyeOY += (avatar.eyeTY - avatar.eyeOY) * 0.12;
-
-    // eyes
-    const eyeGap = faceW * 0.18;
-    const eyeW = faceW * 0.12;
-    const eyeH = faceH * 0.28;
-
-    function drawEye(ex) {
-      ctx.fillStyle = "#111";
-      drawRoundedRect(
-        ctx,
-        ex - eyeW / 2 + avatar.eyeOX,
-        faceCY - eyeH / 2 + avatar.eyeOY,
-        eyeW,
-        eyeH,
-        eyeW / 2
-      );
-      ctx.fill();
-
-      // tiny highlight
-      ctx.save();
-      ctx.globalAlpha = 0.25;
-      ctx.fillStyle = "#fff";
-      drawRoundedRect(
-        ctx,
-        ex - eyeW * 0.18 + avatar.eyeOX,
-        faceCY - eyeH * 0.18 + avatar.eyeOY,
-        eyeW * 0.22,
-        eyeH * 0.18,
-        3
-      );
-      ctx.fill();
-      ctx.restore();
-    }
-
-    drawEye(faceCX - eyeGap);
-    drawEye(faceCX + eyeGap);
-
-    requestAnimationFrame(renderBean);
+    requestAnimationFrame(animateBg);
   }
+  requestAnimationFrame(animateBg);
 
-  // Start animation loop once
-  requestAnimationFrame(renderBean);
-
-  // Mouse tracking over the whole stage (including canvas)
-  function setMouseFromEvent(e) {
-    const rect = charCanvas.getBoundingClientRect();
-    avatar.mouseX = (e.clientX - rect.left) * (rect.width ? (rect.width / rect.width) : 1);
-    avatar.mouseY = (e.clientY - rect.top) * (rect.height ? (rect.height / rect.height) : 1);
-    // NOTE: Since we render in CSS pixels (transform), we can use rect-relative pixels directly.
-    // If your canvas CSS size changes drastically, this still tracks fine visually.
-  }
-
-  charCanvas.addEventListener("mousemove", (e) => setMouseFromEvent(e));
-  charCanvas.addEventListener("mouseleave", () => {
-    avatar.mouseX = null;
-    avatar.mouseY = null;
+  /* ========= AVATAR ========= */
+  const mouse = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+  window.addEventListener("mousemove", (e) => {
+    mouse.x = e.clientX;
+    mouse.y = e.clientY;
   });
 
-  // Click → jump + sound
-  function boing() {
+  const avatar = {
+    x: window.innerWidth * 0.5,
+    y: window.innerHeight * 0.74,
+    vx: 0,
+    vy: 0,
+    r: 46,
+    groundY() { return window.innerHeight * 0.78; }
+  };
+
+  function playTap() {
     try {
-      const AC = new (window.AudioContext || window.webkitAudioContext)();
-      const o = AC.createOscillator();
-      const g = AC.createGain();
+      const ac = new (window.AudioContext || window.webkitAudioContext)();
+      const o = ac.createOscillator();
+      const g = ac.createGain();
       o.type = "sine";
+      o.frequency.value = 740;
       o.connect(g);
-      g.connect(AC.destination);
-
-      const now = AC.currentTime;
+      g.connect(ac.destination);
+      const now = ac.currentTime;
       g.gain.setValueAtTime(0, now);
-      g.gain.linearRampToValueAtTime(0.14, now + 0.01);
-      o.frequency.setValueAtTime(260, now);
-      o.frequency.exponentialRampToValueAtTime(520, now + 0.08);
-      o.frequency.exponentialRampToValueAtTime(220, now + 0.20);
-      g.gain.exponentialRampToValueAtTime(0.0001, now + 0.26);
-
+      g.gain.linearRampToValueAtTime(0.12, now + 0.01);
+      o.frequency.exponentialRampToValueAtTime(520, now + 0.12);
+      g.gain.exponentialRampToValueAtTime(0.0001, now + 0.22);
       o.start(now);
-      o.stop(now + 0.28);
+      o.stop(now + 0.24);
     } catch {}
   }
 
-  charCanvas.addEventListener("click", () => {
-    // impulse upward (negative y is up)
-    avatar.vy = -9.5;
-    boing();
-  });
-
-  // Change current age used by avatar look
-  function setAvatarAge(age) {
-    avatar.age = Number(age) || 18;
+  function impulseJump() {
+    avatar.vy -= 520; // spam-click stacks (as requested)
   }
 
-  /* ============ BUTTON EVENTS ============ */
+  window.addEventListener("pointerdown", () => {
+    impulseJump();
+  });
+
+  /* ========= BLINKING (human-ish) ========= */
+  const blink = {
+    timer: 0,
+    next: 2.8 + Math.random() * 3.2, // 2.8–6.0 seconds
+    phase: 0, // 0 = not blinking, otherwise 0..1..0
+    dur: 0.14 // seconds for a full blink
+  };
+
+  function updateBlink(dt) {
+    if (blink.phase > 0) {
+      blink.phase += dt / blink.dur;
+      if (blink.phase >= 2) {
+        blink.phase = 0;
+        blink.timer = 0;
+        blink.next = 2.8 + Math.random() * 3.2;
+      }
+      return;
+    }
+
+    blink.timer += dt;
+    if (blink.timer >= blink.next) {
+      blink.phase = 0.0001; // start blink
+    }
+  }
+
+  function blinkAmount() {
+    if (blink.phase === 0) return 0;
+    // phase goes 0..2 where 1 is fully closed
+    const p = blink.phase <= 1 ? blink.phase : (2 - blink.phase);
+    // smooth close/open
+    return Math.sin(Math.PI * p); // 0 -> 1 -> 0
+  }
+
+  function drawAvatar(ctx) {
+    const x = avatar.x, y = avatar.y;
+    const scale = Math.max(0.8, Math.min(1.25, window.innerWidth / 1200));
+    const R = avatar.r * scale;
+
+    const body = "#63B5FF";
+    const bodyShade = "rgba(0,0,0,0.06)";
+    const face = "#FFFFFF";
+    const cheek = "rgba(255,140,170,0.55)";
+    const eye = "#151515";
+    const eyeShine = "rgba(255,255,255,0.75)";
+
+    // shadow
+    ctx.save();
+    ctx.globalAlpha = 0.25;
+    ctx.fillStyle = "#000";
+    ctx.beginPath();
+    ctx.ellipse(x, avatar.groundY() + R * 0.35, R * 0.85, R * 0.25, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    // body
+    ctx.fillStyle = body;
+    ctx.beginPath();
+    ctx.ellipse(x, y, R * 1.05, R * 1.15, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // body shade
+    ctx.fillStyle = bodyShade;
+    ctx.beginPath();
+    ctx.ellipse(x + R * 0.15, y + R * 0.25, R * 0.85, R * 0.95, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    /**
+     * ✅ REMOVE THE "BLUE CIRCLE / RING"
+     * Make the face slightly bigger and drawn on top so it covers any blue border.
+     */
+    ctx.fillStyle = face;
+    ctx.beginPath();
+    ctx.ellipse(x, y - R * 0.12, R * 0.70, R * 0.82, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // cheeks FIRST
+    ctx.fillStyle = cheek;
+    ctx.beginPath();
+    ctx.ellipse(x - R * 0.34, y + R * 0.10, R * 0.20, R * 0.13, 0, 0, Math.PI * 2);
+    ctx.ellipse(x + R * 0.34, y + R * 0.10, R * 0.20, R * 0.13, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // eyes follow mouse (clamped)
+    const dx = mouse.x - x;
+    const dy = mouse.y - (y - R * 0.10);
+    const len = Math.hypot(dx, dy) || 1;
+    const ox = (dx / len) * Math.min(R * 0.08, len * 0.02);
+    const oy = (dy / len) * Math.min(R * 0.08, len * 0.02);
+
+    // blinking scale
+    const b = blinkAmount();              // 0..1..0
+    const eyeScaleY = 1 - 0.92 * b;       // squish almost to 0
+    const eyeH = R * 0.42 * eyeScaleY;
+    const eyeW = R * 0.16;
+
+    // keep eyes centered while shrinking
+    const eyeY = (y - R * 0.10 + oy) + (R * 0.42 - eyeH) * 0.5;
+
+    // eyes ON TOP of cheeks
+    ctx.fillStyle = eye;
+
+    // left eye
+    ctx.beginPath();
+    ctx.roundRect(
+      x - R * 0.18 + ox,
+      eyeY,
+      eyeW,
+      Math.max(2, eyeH),
+      R * 0.08
+    );
+    ctx.fill();
+
+    // right eye
+    ctx.beginPath();
+    ctx.roundRect(
+      x + R * 0.02 + ox,
+      eyeY,
+      eyeW,
+      Math.max(2, eyeH),
+      R * 0.08
+    );
+    ctx.fill();
+
+    // eye shine (only if not fully closed)
+    if (eyeH > 6) {
+      ctx.fillStyle = eyeShine;
+      ctx.beginPath();
+      ctx.roundRect(x - R * 0.13 + ox, eyeY + R * 0.05, R * 0.05, R * 0.12 * eyeScaleY, R * 0.03);
+      ctx.roundRect(x + R * 0.07 + ox, eyeY + R * 0.05, R * 0.05, R * 0.12 * eyeScaleY, R * 0.03);
+      ctx.fill();
+    }
+
+    // feet blobs
+    ctx.fillStyle = "rgba(0,0,0,0.08)";
+    ctx.beginPath();
+    ctx.ellipse(x - R * 0.28, y + R * 0.60, R * 0.30, R * 0.18, 0, 0, Math.PI * 2);
+    ctx.ellipse(x + R * 0.28, y + R * 0.60, R * 0.30, R * 0.18, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  let lastChT = 0;
+  function animateAvatar(t) {
+    const now = t || 0;
+    const dt = Math.min(0.05, (now - lastChT) / 1000 || 0.016);
+    lastChT = now;
+
+    updateBlink(dt);
+
+    avatar.x = Math.max(80, Math.min(window.innerWidth - 80, avatar.x));
+
+    // physics
+    const g = 1800;
+    avatar.vy += g * dt;
+    avatar.y += avatar.vy * dt;
+
+    const floor = avatar.groundY();
+    if (avatar.y > floor) {
+      avatar.y = floor;
+
+      if (avatar.vy > 220) playTap();
+
+      avatar.vy = -avatar.vy * 0.32;
+      if (Math.abs(avatar.vy) < 40) avatar.vy = 0;
+    }
+
+    chCtx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+    drawAvatar(chCtx);
+
+    requestAnimationFrame(animateAvatar);
+  }
+  requestAnimationFrame(animateAvatar);
+
+  /* ========= BUTTONS ========= */
   startBtn.addEventListener("click", () => {
     hideError();
 
     const age = parseInt(ageInput.value, 10);
-    const dobStr = (bdayInput?.value || "").trim();
+    const dobStr = (bdayInput.value || "").trim();
     const dob = parseDOB(dobStr);
 
     if (!age || age < 1 || age > 130) {
@@ -442,30 +426,24 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    // If DOB is in the future -> invalid
-    const now = new Date();
-    if (dob > now) {
-      showError("That doesn't make sense stop lying");
-      return;
-    }
-
-    // "Stop lying" check: age must match DOB age (allow 1 year wiggle for timezone / rounding)
-    const realAge = ageFromDOB(dob, now);
-    if (Math.abs(realAge - age) > 1) {
-      showError("That doesn't make sense stop lying");
+    const calcAge = calcAgeFromDOB(dob);
+    if (Math.abs(calcAge - age) >= 2) {
+      showError("That doesnt make sense stop lying");
       return;
     }
 
     fillScene(age, dobStr);
-    setAvatarAge(age);
     goToScene();
   });
 
   backBtn.addEventListener("click", () => {
     backToWelcome();
-    // optional: keep avatar age preview in welcome if you want
   });
 
-  // Initial preview age
-  setAvatarAge(18);
+  // Enter key submits on welcome
+  [ageInput, bdayInput].forEach((el) => {
+    el.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") startBtn.click();
+    });
+  });
 });
