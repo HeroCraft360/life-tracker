@@ -22,7 +22,7 @@ html, body {
   height: 100%;
   margin: 0;
   font-family: 'Press Start 2P', monospace;
-  -webkit-font-smoothing: none; /* crisp pixels */
+  -webkit-font-smoothing: none;
   background: radial-gradient(1000px 540px at 50% -10%, #eaf6ff 0%, #f6fafc 70%);
   color: var(--ink);
 }
@@ -85,6 +85,7 @@ html, body {
   align-items: center;
   gap: 14px;
   margin: 0 auto 10px;
+  flex-wrap: wrap;
 }
 
 input#ageInput,
@@ -143,7 +144,7 @@ input#bdayInput:focus {
 }
 
 /* ======================================
-   SCENE SCREEN (Sky + Pixel Avatar)
+   SCENE SCREEN
 ====================================== */
 #scene {
   text-align: center;
@@ -192,13 +193,8 @@ input#bdayInput:focus {
   color: var(--ink);
   margin-bottom: 28px;
 }
-.countdown-line {
-  margin: 4px 0;
-}
-.countdown-big {
-  margin-top: 8px;
-  color: #2c7f77;
-}
+.countdown-line { margin: 4px 0; }
+.countdown-big { margin-top: 8px; color: #2c7f77; }
 
 /* Stage with sky + character */
 .stage {
@@ -207,7 +203,7 @@ input#bdayInput:focus {
   justify-content: center;
   align-items: flex-end;
   margin: 0 auto;
-  width: 900px;
+  width: min(900px, 100%);
   height: 300px;
 }
 
@@ -233,39 +229,18 @@ input#bdayInput:focus {
   font-size: 11px;
 }
 
-
-
-/* ========== Modal for Google sign-in ========== */
-.modal {
-  position: fixed; inset: 0;
-  background: rgba(20,30,40,.35);
-  display: flex; align-items: center; justify-content: center;
-  z-index: 9999;
-  font-family: 'Press Start 2P', monospace;
-}
-.modal-card {
-  width: min(520px, 92%);
-  background: var(--pill);
-  border-radius: 16px;
+/* Bottom-left coming soon badge */
+.coming-soon{
+  position: fixed;
+  left: 14px;
+  bottom: 14px;
+  padding: 10px 12px;
+  font-size: 10px;
+  background: rgba(255,255,255,.9);
+  border: 1px solid #e1eef6;
+  border-radius: 12px;
   box-shadow: var(--shadow);
-  padding: 22px 20px;
-  text-align: center;
+  color: var(--muted);
+  z-index: 999;
+  user-select: none;
 }
-.modal-title { margin: 0 0 10px; color: #2c7f77; font-size: 18px; }
-.modal-sub { color: var(--muted); font-size: 12px; margin: 0 0 14px; }
-
-.modal-actions { display: flex; gap: 10px; justify-content: center; margin-bottom: 8px; }
-.btn {
-  font-family: inherit; font-size: 12px; cursor: pointer;
-  border-radius: 12px; border: 2px solid transparent;
-  padding: 12px 14px;
-}
-.btn.primary { background: linear-gradient(180deg, var(--btn1), var(--btn2)); color: #073a3a; }
-.btn.ghost { background: #fff; color: var(--ink); border-color: #dfeaf3; }
-.btn.tiny { padding: 6px 10px; font-size: 10px; border: 1px solid #cfe3ee; background: #fff; }
-
-.warn { color: #d84b4b; background: #ffe8e8; border:1px solid #f4b7b7; padding: 6px 8px; border-radius: 8px; display: inline-block; }
-
-/* user box in topbar */
-.userbox { margin-left: auto; display: flex; align-items: center; gap: 8px; }
-.userbox #userName { color: #2c7f77; font-size: 11px; }

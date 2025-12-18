@@ -1,22 +1,6 @@
-// Life Tracker — Google Sign-in + Cloud Save (Firestore) + Guest fallback
+// Life Tracker — age + DOB validation, countdown, clouds, pixel avatar, local save/load
 document.addEventListener("DOMContentLoaded", () => {
-  /* ========= Firebase handles (from index.html) ========= */
-  const auth = window.auth;
-  const db = window.db;
-  const googleProvider = window.googleProvider;
-
-  if (!auth || !db || !googleProvider) {
-    console.error("Firebase not initialized. Check firebaseConfig in index.html.");
-    return;
-  }
-
-  /* ========= DOM ========= */
-  const modal = document.getElementById("authModal");
-  const googleBtn = document.getElementById("googleBtn");
-  const guestBtn = document.getElementById("guestBtn");
-  const guestWarn = document.getElementById("guestWarn");
-  const authError = document.getElementById("authError");
-
+  /* ============ DOM HOOKS ============ */
   const screens = {
     welcome: document.getElementById("welcome"),
     scene: document.getElementById("scene"),
@@ -24,9 +8,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const startBtn = document.getElementById("startBtn");
   const backBtn = document.getElementById("backBtn");
-  const signOutBtn = document.getElementById("signOutBtn");
-  const userBox = document.getElementById("userBox");
-  const userName = document.getElementById("userName");
 
   const ageInput = document.getElementById("ageInput");
   const bdayInput = document.getElementById("bdayInput");
@@ -42,48 +23,32 @@ document.addEventListener("DOMContentLoaded", () => {
   const charCanvas = document.getElementById("characterCanvas");
   const chCtx = charCanvas.getContext("2d");
 
-  /* ========= State ========= */
-  let currentUser = null;
-  const LS_KEY = "lifeTracker:v1";
+  /* ============ PERSISTENCE (guest/local) ============ */
+  const STORAGE_KEY = "lifeTracker:v1";
+  function saveState(age, dobStr) {
+    try {
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ age: Number(age), dob: dobStr, savedAt: Date.now() })
+      );
+    } catch {}
+  }
+  function loadState() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return null;
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }
 
-  /* ========= UI helpers ========= */
+  /* ============ SCREEN TRANSITIONS ============ */
   function show(el) { el.classList.remove("hidden"); }
   function hide(el) { el.classList.add("hidden"); }
 
-  function showError(t) { errorMsg.textContent = t; errorMsg.classList.remove("hidden"); }
-  function hideError() { errorMsg.classList.add("hidden"); }
-
-  function showAuthError(t) {
-    if (!authError) return;
-    authError.textContent = t;
-    authError.classList.remove("hidden");
-  }
-  function clearAuthError() {
-    if (!authError) return;
-    authError.textContent = "";
-    authError.classList.add("hidden");
-  }
-
-  function openModal() {
-    show(modal);
-    hide(screens.welcome);
-    hide(screens.scene);
-  }
-  function openWelcome() {
-    hide(modal);
-    show(screens.welcome);
-    hide(screens.scene);
-  }
-  function isSceneVisible() {
-    return !screens.scene.classList.contains("hidden");
-  }
-
-  /* ========= Screen transitions ========= */
   function goToScene() {
-    if (isSceneVisible()) return;
-
-    const welcome = screens.welcome;
-    const scene = screens.scene;
+    const welcome = screens.welcome, scene = screens.scene;
 
     scene.classList.add("is-entering");
     show(scene);
@@ -102,8 +67,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function backToWelcome() {
-    const welcome = screens.welcome;
-    const scene = screens.scene;
+    const welcome = screens.welcome, scene = screens.scene;
 
     welcome.classList.add("is-entering");
     show(welcome);
@@ -121,62 +85,67 @@ document.addEventListener("DOMContentLoaded", () => {
     }, 450);
   }
 
-  /* ========= DOB parsing + countdown ========= */
-  const DOB_REGEX = /^(\d{2})\/(\d{2})\/(\d{4})$/;
+  /* ============ VALIDATION + DATE HELPERS ============ */
+  const DOB_REGEX = /^(\d{2})\/(\d{2})\/(\d{4})$/; // MM/DD/YYYY
+
+  function showError(text) {
+    errorMsg.textContent = text;
+    errorMsg.classList.remove("hidden");
+  }
+  function hideError() {
+    errorMsg.classList.add("hidden");
+  }
 
   function parseDOB(str) {
     if (!str) return null;
     const m = DOB_REGEX.exec(str.trim());
     if (!m) return null;
+    const mm = parseInt(m[1], 10);
+    const dd = parseInt(m[2], 10);
+    const yyyy = parseInt(m[3], 10);
 
-    const mm = +m[1], dd = +m[2], yyyy = +m[3];
     if (mm < 1 || mm > 12 || dd < 1 || dd > 31) return null;
 
     const d = new Date(yyyy, mm - 1, dd);
     if (d.getFullYear() !== yyyy || d.getMonth() !== (mm - 1) || d.getDate() !== dd) return null;
+
     return d;
+  }
+
+  // "real age" in years given DOB and "today"
+  function computeAgeFromDOB(dob, now = new Date()) {
+    let age = now.getFullYear() - dob.getFullYear();
+    const m = now.getMonth() - dob.getMonth();
+    if (m < 0 || (m === 0 && now.getDate() < dob.getDate())) age--;
+    return age;
   }
 
   function daysUntilNextBirthday(dob, now = new Date()) {
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    let next = new Date(today.getFullYear(), dob.getMonth(), dob.getDate());
-    if (next < today) next = new Date(today.getFullYear() + 1, dob.getMonth(), dob.getDate());
+    const m = dob.getMonth();
+    const d = dob.getDate();
+    let next = new Date(today.getFullYear(), m, d);
+    if (next < today) next = new Date(today.getFullYear() + 1, m, d);
     const MS = 24 * 60 * 60 * 1000;
     return Math.ceil((next - today) / MS);
   }
 
-  function fillScene(age, dobStr) {
-    ageBadge.textContent = `Age — ${age}`;
-    ageLabel.textContent = `Age: ${age}`;
-    bdayLabel.textContent = `Birthdate: ${dobStr}`;
+  // Checks if entered age is compatible with DOB.
+  // Allow ±1 year because birthday might not have happened yet this year.
+  function ageDobMakesSense(enteredAge, dob) {
+    const now = new Date();
+    const dobMidnight = new Date(dob.getFullYear(), dob.getMonth(), dob.getDate());
+    const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-    const dob = parseDOB(dobStr);
-    if (dob) daysLeftEl.textContent = String(daysUntilNextBirthday(dob));
+    if (dobMidnight > todayMidnight) return false; // born in the future
+
+    const computed = computeAgeFromDOB(dob, now);
+    const diff = Math.abs(computed - enteredAge);
+
+    return diff <= 1; // tolerance
   }
 
-  /* ========= Persistence ========= */
-  async function saveProgress(age, dobStr) {
-    if (currentUser) {
-      await db.collection("users").doc(currentUser.uid).set(
-        { age: Number(age), dob: dobStr, updatedAt: Date.now() },
-        { merge: true }
-      );
-    } else {
-      localStorage.setItem(LS_KEY, JSON.stringify({ age: Number(age), dob: dobStr, updatedAt: Date.now() }));
-    }
-  }
-
-  async function loadProgress() {
-    if (currentUser) {
-      const doc = await db.collection("users").doc(currentUser.uid).get();
-      return doc.exists ? doc.data() : null;
-    } else {
-      const raw = localStorage.getItem(LS_KEY);
-      return raw ? JSON.parse(raw) : null;
-    }
-  }
-
-  /* ========= Sky / clouds ========= */
+  /* ============ SKY: PASTEL CLOUDS ============ */
   function sizeBgToCSSPixels() {
     const dpr = Math.max(1, window.devicePixelRatio || 1);
     const rect = bgCanvas.getBoundingClientRect();
@@ -184,9 +153,8 @@ document.addEventListener("DOMContentLoaded", () => {
     bgCanvas.height = Math.round(rect.height * dpr);
     bgCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
-
   sizeBgToCSSPixels();
-  window.addEventListener("resize", sizeBgToCSSPixels); // ✅ FIXED
+  window.addEventListener("resize", sizeBgToCSSPixels);
 
   const clouds = Array.from({ length: 6 }).map((_, i) => ({
     x: Math.random() * 900,
@@ -225,7 +193,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   requestAnimationFrame(animateSky);
 
-  /* ========= Pixel avatar ========= */
+  /* ============ PIXEL AVATAR (16x16 grid) ============ */
   function drawBlock(ctx, gx, gy, color, scale) {
     ctx.fillStyle = color;
     ctx.fillRect(gx * scale, gy * scale, scale, scale);
@@ -250,11 +218,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // head
     for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) drawBlock(ctx, 6 + x, 1 + y, skin, scale);
-
     // hair
     if (group !== "adult") [[6,0],[7,0],[8,0],[9,0],[5,1],[10,1]].forEach(([x,y]) => drawBlock(ctx, x, y, hair, scale));
     else [[7,0],[8,0],[6,1],[9,1]].forEach(([x,y]) => drawBlock(ctx, x, y, hair, scale));
-
     // eyes
     drawBlock(ctx, 7, 2, "#201f1f", scale);
     drawBlock(ctx, 8, 2, "#201f1f", scale);
@@ -273,147 +239,76 @@ document.addEventListener("DOMContentLoaded", () => {
     // shoes
     [[3,14],[4,14],[11,14],[12,14]].forEach(([x,y]) => drawBlock(ctx, x, y, "#2b2b2b", scale));
 
+    // elder extras
+    if (group === "elder") {
+      [[6,2],[9,2]].forEach(([x,y]) => drawBlock(ctx, x, y, "#6b6b6b", scale));
+      [[13,11],[13,12]].forEach(([x,y]) => drawBlock(ctx, x, y, "#6b5b4b", scale));
+    }
+
     ctx.restore();
 
-    // gentle bob (start once)
+    // bob once
     if (!drawCharacterForAge._bob) {
       let t = 0;
-      (function bob() {
+      function bob() {
         t += 0.04;
         charCanvas.style.transform = `translateY(${Math.sin(t) * 2}px)`;
         requestAnimationFrame(bob);
-      })();
+      }
       drawCharacterForAge._bob = true;
+      requestAnimationFrame(bob);
     }
   }
 
-  /* ========= Sound ========= */
-  function ding() {
-    try {
-      const AC = new (window.AudioContext || window.webkitAudioContext)();
-      const o = AC.createOscillator(), g = AC.createGain();
-      o.type = "sine"; o.frequency.value = 880;
-      o.connect(g); g.connect(AC.destination);
-      const now = AC.currentTime;
-      g.gain.setValueAtTime(0, now);
-      g.gain.linearRampToValueAtTime(0.12, now + 0.01);
-      o.frequency.exponentialRampToValueAtTime(660, now + 0.12);
-      g.gain.exponentialRampToValueAtTime(0.0001, now + 0.25);
-      o.start(now); o.stop(now + 0.26);
-    } catch {}
+  /* ============ SCENE LABEL HELPERS ============ */
+  function fillScene(age, dobStr) {
+    ageBadge.textContent = `Age — ${age}`;
+    ageLabel.textContent = `Age: ${age}`;
+    bdayLabel.textContent = `Birthdate: ${dobStr}`;
+    const dob = parseDOB(dobStr);
+    if (dob) daysLeftEl.textContent = String(daysUntilNextBirthday(dob));
   }
 
-  /* ========= Auth buttons ========= */
-  guestBtn.addEventListener("click", async () => {
-    clearAuthError();
-    guestWarn.classList.remove("hidden");
-    openWelcome();
-
-    // guest auto-resume if local data exists
-    const saved = await loadProgress();
-    if (saved?.age && saved?.dob) {
-      ageInput.value = saved.age;
-      bdayInput.value = saved.dob;
-      fillScene(saved.age, saved.dob);
-      goToScene();
-      drawCharacterForAge(chCtx, saved.age);
-    }
-  });
-
-  googleBtn.addEventListener("click", async () => {
-    clearAuthError();
-    googleBtn.disabled = true;
-
-    try {
-      // keep signed in across refresh
-      await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
-
-      // popup sign-in
-      await auth.signInWithPopup(googleProvider);
-      // auth state callback will run after this
-    } catch (e) {
-      console.warn(e);
-
-      const code = e?.code || "";
-      if (code === "auth/popup-blocked" || code === "auth/cancelled-popup-request") {
-        showAuthError("Popup blocked — switching to redirect sign-in...");
-        try {
-          await auth.signInWithRedirect(googleProvider);
-          return;
-        } catch (e2) {
-          console.warn(e2);
-        }
-      }
-
-      if (code === "auth/unauthorized-domain") {
-        showAuthError("Unauthorized domain. Add your Netlify domain in Firebase → Auth → Settings → Authorized domains.");
-      } else {
-        showAuthError("Google sign-in failed. Check Firebase Auth + Authorized domains.");
-      }
-    } finally {
-      googleBtn.disabled = false;
-    }
-  });
-
-  signOutBtn.addEventListener("click", async () => {
-    await auth.signOut();
-    currentUser = null;
-    userBox.classList.add("hidden");
-    backToWelcome();
-    openModal();
-  });
-
-  /* ========= Auth state ========= */
-  auth.onAuthStateChanged(async (user) => {
-    currentUser = user;
-
-    if (!user) {
-      userBox.classList.add("hidden");
-      openModal();
-      return;
-    }
-
-    // signed in
-    userName.textContent = user.displayName || user.email || "Signed in";
-    userBox.classList.remove("hidden");
-    guestWarn.classList.add("hidden");
-    clearAuthError();
-
-    // If user already saved progress in Firestore, auto-resume and skip form
-    const saved = await loadProgress();
-    openWelcome();
-
-    if (saved?.age && saved?.dob) {
-      ageInput.value = saved.age;
-      bdayInput.value = saved.dob;
-
-      fillScene(saved.age, saved.dob);
-      goToScene();
-      drawCharacterForAge(chCtx, saved.age);
-    }
-  });
-
-  /* ========= Start button ========= */
-  startBtn.addEventListener("click", async () => {
+  /* ============ BUTTON EVENTS ============ */
+  startBtn.addEventListener("click", () => {
     hideError();
 
     const age = parseInt(ageInput.value, 10);
     const dobStr = (bdayInput?.value || "").trim();
     const dob = parseDOB(dobStr);
 
-    if (!age || age < 1 || age > 130) { showError("Please enter a valid age 1–130"); return; }
-    if (!dob) { showError("Error enter your Birthdate pls"); return; }
+    if (!age || age < 1 || age > 130) {
+      showError("Please enter a valid age 1–130");
+      return;
+    }
+    if (!dob) {
+      showError("Error enter your Birthdate pls");
+      return;
+    }
+
+    // New logic: age + DOB must match reality-ish
+    if (!ageDobMakesSense(age, dob)) {
+      showError("That doesn’t make sense stop lying");
+      return;
+    }
 
     fillScene(age, dobStr);
     goToScene();
     drawCharacterForAge(chCtx, age);
-    ding();
-
-    await saveProgress(age, dobStr);
+    saveState(age, dobStr);
   });
 
-  backBtn.addEventListener("click", () => backToWelcome());
+  backBtn.addEventListener("click", () => {
+    backToWelcome();
+  });
 
-  /* ========= Initial preview ========= */
+  /* ============ AUTO-LOAD (Resume) ============ */
+  const saved = loadState();
+  if (saved && typeof saved.age === "number" && saved.dob) {
+    ageInput.value = saved.age;
+    bdayInput.value = saved.dob;
+  }
+
+  /* ============ INITIAL PREVIEW ============ */
   drawCharacterForAge(chCtx, 18);
 });

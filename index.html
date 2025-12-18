@@ -5,77 +5,31 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Life Tracker</title>
   <link rel="stylesheet" href="css/style.css" />
-
-  <!-- Firebase SDKs (compat) -->
-  <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
-
-  <!-- Firebase init (MUST be real values, not YOUR_API_KEY placeholders) -->
-  <script>
-    window.firebaseConfig = {
-      apiKey: "AIzaSyAvxVynK0bzI16aZr2xBu1F1ZHxLHo41k",
-      authDomain: "life-tracker-9c30d.firebaseapp.com",
-      projectId: "life-tracker-9c30d",
-      storageBucket: "life-tracker-9c30d.firebasestorage.app",
-      messagingSenderId: "470243756808",
-      appId: "1:470243756808:web:bc9e27edc64479162f7abd",
-      measurementId: "G-755K27986X"
-    };
-
-    firebase.initializeApp(window.firebaseConfig);
-    window.auth = firebase.auth();
-    window.db = firebase.firestore();
-    window.googleProvider = new firebase.auth.GoogleAuthProvider();
-    // optional: force account picker
-    window.googleProvider.setCustomParameters({ prompt: "select_account" });
-  </script>
-
   <script src="js/script.js" defer></script>
 </head>
 
 <body>
-  <!-- AUTH MODAL -->
-  <div id="authModal" class="modal">
-    <div class="modal-card">
-      <h2 class="modal-title">Welcome to Life Tracker</h2>
-      <p class="modal-sub">Sign in with Google to save your progress across devices.</p>
-
-      <div class="modal-actions">
-        <button id="googleBtn" class="btn primary" type="button">Sign in with Google</button>
-        <button id="guestBtn" class="btn ghost" type="button">Continue without login</button>
-      </div>
-
-      <p id="guestWarn" class="warn hidden">Progress will be lost if you don’t sign in.</p>
-      <p id="authError" class="warn hidden"></p>
-    </div>
-  </div>
-
   <main id="screens">
     <!-- WELCOME SCREEN -->
-    <section id="welcome" class="screen hidden">
+    <section id="welcome" class="screen">
       <h1 class="title">Life Tracker</h1>
       <p class="hint">Enter your age and birthdate</p>
 
       <div class="controls">
         <input id="ageInput" type="number" min="1" max="130" placeholder="e.g. 19" />
         <input id="bdayInput" type="text" placeholder="MM/DD/YYYY" />
-        <button id="startBtn" type="button">Enter</button>
+        <button id="startBtn">Enter</button>
       </div>
 
-      <div id="errorMsg" class="hidden">Error enter your Birthdate pls</div>
+      <div id="errorMsg" class="hidden"></div>
       <small class="sub">A tiny pixel avatar will be created for you ✨</small>
     </section>
 
     <!-- SCENE SCREEN -->
     <section id="scene" class="screen hidden">
       <div class="topbar">
-        <button id="backBtn" type="button">← Back</button>
+        <button id="backBtn">← Back</button>
         <div class="age-label" id="ageBadge">Age —</div>
-        <div id="userBox" class="userbox hidden">
-          <span id="userName">—</span>
-          <button id="signOutBtn" class="btn tiny" type="button">Sign out</button>
-        </div>
       </div>
 
       <div class="countdown-box">
@@ -96,5 +50,8 @@
       </div>
     </section>
   </main>
+
+  <!-- Bottom-left "coming soon" badge -->
+  <div class="coming-soon">Google sign in COMING SOON</div>
 </body>
 </html>
