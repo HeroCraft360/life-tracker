@@ -9,50 +9,211 @@
   <script src="js/script.js" defer></script>
 </head>
 
-<body>
-  <!-- Bottom-left badge -->
-  <div class="coming-soon">Google sign in COMING SOON</div>
-
+<body data-theme="day">
   <main id="screens">
-    <!-- WELCOME -->
     <section id="welcome" class="screen">
-      <h1 class="title">Life Tracker</h1>
-      <p class="hint">Enter your age and birthdate</p>
+      <div class="welcome-content">
+        <h1 class="title">Life Tracker</h1>
+        <p class="hint">Build a personal countdown, milestone map, and tiny daily log.</p>
 
-      <div class="controls">
-        <input id="ageInput" type="number" min="1" max="130" placeholder="e.g. 19" />
-        <input id="bdayInput" type="text" placeholder="MM/DD/YYYY" />
-        <button id="startBtn" type="button">Enter</button>
+        <form id="profileForm" class="controls" novalidate>
+          <label class="field" for="bdayInput">
+            <span>Birthdate</span>
+            <input
+              id="bdayInput"
+              type="date"
+              autocomplete="bday"
+              aria-describedby="dateHelp errorMsg"
+              required
+            />
+          </label>
+
+          <button id="startBtn" type="submit">Enter</button>
+        </form>
+
+        <p id="dateHelp" class="sub">Your profile and check-ins are saved in this browser.</p>
+        <div id="errorMsg" class="hidden" role="alert" aria-live="polite"></div>
+        <button id="clearBtn" class="clear-btn welcome-clear hidden" type="button">Clear saved date</button>
+        <div class="status-badge welcome-status" id="statusBadge">Local profile</div>
       </div>
-
-      <div id="errorMsg" class="hidden">Error enter your Birthdate pls</div>
-      <small class="sub">A tiny pixel avatar will be created for you ✨</small>
     </section>
 
-    <!-- SCENE -->
     <section id="scene" class="screen hidden">
-      <!-- Fullscreen canvases -->
       <div class="stage" aria-hidden="true">
         <canvas id="bgCanvas"></canvas>
+        <canvas id="fxCanvas"></canvas>
         <canvas id="characterCanvas"></canvas>
       </div>
 
-      <!-- HUD overlay (stays put) -->
       <div class="hud">
-        <button id="backBtn" class="hud-btn" type="button">← Back</button>
+        <div class="hud-top">
+          <button id="backBtn" class="hud-btn" type="button">Back</button>
 
-        <div class="countdown-box">
-          <div class="countdown-line" id="bdayLabel">Birthdate: —</div>
-          <div class="countdown-line" id="ageLabel">Age: —</div>
-          <div class="countdown-big">
-            <span id="daysLeft">—</span> days till your big day 🎉
+          <div class="age-label" id="ageBadge">Age --</div>
+        </div>
+      </div>
+
+      <div class="scene-content">
+        <div class="scene-topbar">
+          <div class="countdown-box" aria-live="polite">
+            <div id="controlHint" class="countdown-controls">A/D move - W/Space jump - S drop</div>
+            <div class="countdown-line" id="bdayLabel">Birthdate: --</div>
+            <div class="countdown-line" id="ageLabel">Age: --</div>
+            <div class="countdown-big" id="countdownMessage">
+              <span id="daysLeft">--</span>
+              <span id="dayWord">days</span>
+              until your birthday
+            </div>
           </div>
         </div>
 
-        <div class="age-label" id="ageBadge">Age —</div>
+        <div id="collectibleLayer" class="collectible-layer" aria-hidden="true"></div>
+        <div class="dashboard-grid">
+          <section class="panel stats-panel" aria-labelledby="statsTitle">
+            <div class="panel-head">
+              <h2 id="statsTitle">Life Stats</h2>
+              <span id="nextBirthdayAge" class="panel-chip">Turns --</span>
+            </div>
+            <div id="statsGrid" class="metric-grid"></div>
+          </section>
+
+          <section class="panel milestones-panel" aria-labelledby="milestonesTitle">
+            <div class="panel-head">
+              <h2 id="milestonesTitle">Milestones</h2>
+              <span id="milestoneSummary" class="panel-chip">-- upcoming</span>
+            </div>
+            <div id="milestoneList" class="milestone-list"></div>
+          </section>
+
+          <section class="panel progress-panel" aria-labelledby="progressTitle">
+            <div class="panel-head">
+              <h2 id="progressTitle">Progress</h2>
+              <div class="segmented" aria-label="Progress view">
+                <button class="segment-btn is-active" type="button" data-progress-mode="year">Year</button>
+                <button class="segment-btn" type="button" data-progress-mode="life">Life</button>
+              </div>
+            </div>
+            <div class="progress-summary" id="progressSummary">--</div>
+            <div id="yearGrid" class="progress-grid year-grid" aria-label="Year progress"></div>
+            <div id="lifeGrid" class="progress-grid life-grid hidden" aria-label="Life weeks"></div>
+          </section>
+
+          <section class="panel mood-panel" aria-labelledby="moodTitle">
+            <div class="panel-head">
+              <h2 id="moodTitle">Today</h2>
+              <div class="mood-head-actions">
+                <span id="moodDate" class="panel-chip">--</span>
+                <button id="saveMoodBtn" class="secondary-btn save-mood-btn" type="button">Save check-in</button>
+              </div>
+            </div>
+            <div id="moodChoices" class="mood-choices"></div>
+            <label class="field note-field" for="moodNote">
+              <span>Note</span>
+              <input id="moodNote" type="text" maxlength="90" placeholder="A small note for today" />
+            </label>
+            <div id="recentMoods" class="recent-list"></div>
+          </section>
+
+          <section class="panel customize-panel" aria-labelledby="customizeTitle">
+            <div class="panel-head">
+              <h2 id="customizeTitle">Avatar</h2>
+              <span id="themeSummary" class="panel-chip">Auto theme</span>
+            </div>
+
+            <div class="control-group">
+              <div class="control-label">Body</div>
+              <div id="avatarColorChoices" class="swatch-row"></div>
+            </div>
+
+            <div class="control-group">
+              <div class="control-label">Cheeks</div>
+              <div id="cheekColorChoices" class="swatch-row"></div>
+            </div>
+
+            <label class="field size-field" for="avatarSizeInput">
+              <span>Size <strong id="avatarSizeValue">18px</strong></span>
+              <input id="avatarSizeInput" type="range" min="10" max="50" step="1" />
+            </label>
+
+            <div class="control-grid">
+              <label class="field" for="accessorySelect">
+                <span>Accessory</span>
+                <select id="accessorySelect">
+                  <option value="none">None</option>
+                  <option value="crown">Crown</option>
+                  <option value="cap">Cap</option>
+                  <option value="bow">Bow</option>
+                  <option value="halo">Halo</option>
+                  <option value="horns">Horns</option>
+                  <option value="headphones">Headphones</option>
+                  <option value="earpods">Ear Pods</option>
+                  <option value="bonnet">Bonnet</option>
+                  <option value="flower">Flower</option>
+                  <option value="star">Star</option>
+                  <option value="scarf">Scarf</option>
+                  <option value="antenna">Antenna</option>
+                  <option value="beret">Beret</option>
+                  <option value="party">Party Hat</option>
+                </select>
+              </label>
+
+              <label class="field" for="themeSelect">
+                <span>Sky</span>
+                <select id="themeSelect">
+                  <option value="auto">Auto</option>
+                  <option value="day">Day</option>
+                  <option value="dusk">Dusk</option>
+                  <option value="night">Night</option>
+                  <option value="meadow">Meadow</option>
+                  <option value="winter">Winter</option>
+                  <option value="aurora">Aurora</option>
+                  <option value="candy">Candy</option>
+                  <option value="storm">Storm</option>
+                  <option value="space">Space</option>
+                  <option value="sunrise">Sunrise</option>
+                </select>
+              </label>
+            </div>
+          </section>
+
+          <section class="panel settings-panel" aria-labelledby="settingsTitle">
+            <div class="panel-head">
+              <h2 id="settingsTitle">Settings</h2>
+              <span id="dataSummary" class="panel-chip">0 check-ins</span>
+            </div>
+
+            <div class="toggle-row">
+              <label class="toggle">
+                <input id="noCloudsToggle" type="checkbox" />
+                <span>No clouds</span>
+              </label>
+              <label class="toggle">
+                <input id="muteToggle" type="checkbox" />
+                <span>Mute sound</span>
+              </label>
+            </div>
+
+            <div class="data-actions">
+              <button id="exportBtn" class="secondary-btn" type="button">Export data</button>
+              <button id="importBtn" class="secondary-btn" type="button">Import data</button>
+              <input id="importFile" class="hidden" type="file" accept="application/json" />
+            </div>
+
+            <div id="settingsMessage" class="settings-message" aria-live="polite"></div>
+          </section>
+        </div>
+        <div class="status-badge scene-status" id="sceneStatusBadge">Local profile</div>
       </div>
 
-      <div class="bottom-right">Generated by Life Tracker • Pastel vibes</div>
+      <button id="questToggle" class="drawer-toggle quest-toggle" type="button" aria-label="Toggle quests" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+      <div id="questTracker" class="quest-tracker" aria-live="polite"></div>
+      <button id="portalToggle" class="drawer-toggle portal-toggle" type="button" aria-label="Toggle portals" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+      <div id="portalDock" class="portal-dock" aria-label="Panel portals"></div>
+      <div id="achievementToast" class="achievement-toast hidden" aria-live="polite"></div>
     </section>
   </main>
 </body>
